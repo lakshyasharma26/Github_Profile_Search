@@ -1,72 +1,92 @@
-const url = "https://api.github.com/users/";
-const searchInputEl = document.getElementById("searchInput");
-const searchButtonEl = document.getElementById("searchBtn");
-const profileContainerEl = document.getElementById("profileContainer");
-const loadingEl = document.getElementById("loading");
-const generateProfile = (profile) => {
-  return `
-   <div class="profile-box">
-   <div class="top-section">
-     <div class="left">
-       <div class="avatar">
-         <img alt="avatar" src="${profile.avatar_url}" />
-       </div>
-       <div class="self">
-         <h1>${profile.name}</h1>
-         <h1>@${profile.login}</h1>
-       </div>
-     </div>
-     <a href="${profile.html_url}" target="_black">
-     <button class="primary-btn">Check Profile</button>
-     </a>
-   </div>
-  <div class="about">
-     <h2>About</h2>
-     <p>
-     ${profile.bio}
-     </p>
-   </div>
-   <div class="status">
-     <div class="status-item">
-       <h3>Followers</h3>
-       <p>${profile.followers}</p>
-     </div>
-     <div class="status-item">
-       <h3>Followings</h3>
-       <p>${profile.following}</p>
-     </div>
-     <div class="status-item">
-       <h3>Repos</h3>
-       <p>${profile.public_repos}</p>
-     </div>
-   </div>
- </div>
-   `;
-};
-const fetchProfile = async () => {
-  const username = searchInputEl.value;
+const APIURL = 'https://api.github.com/users/'
 
-  loadingEl.innerText = "loading.....";
-  loadingEl.style.color = "black";
+const main = document.getElementById('main')
+const form = document.getElementById('form')
+const search = document.getElementById('search')
 
-  try {
-    const res = await fetch(`${url}/${username}`);
-    const data = await res.json();
-    if (data.bio) {
-      loadingEl.innerText = "";
-      profileContainerEl.innerHTML = generateProfile(data);
-    } else {
-      loadingEl.innerHTML = data.message;
-      loadingEl.style.color = "red";
-      profileContainerEl.innerText = "";
+async function getUser(username) {
+    try {
+        const { data } = await axios(APIURL + username)
+
+        createUserCard(data)
+        getRepos(username)
+    } catch(err) {
+        if(err.response.status == 404) {
+            createErrorCard('No profile with this username')
+        }
     }
+}
 
-    console.log("data", data);
-  } catch (error) {
-    console.log({ error });
-    loadingEl.innerText = "";
-  }
-};
-searchButtonEl.addEventListener("click", fetchProfile);
+async function getRepos(username) {
+    try {
+        const { data } = await axios(APIURL + username + '/repos?sort=created')
 
+        addReposToCard(data)
+    } catch(err) {
+        createErrorCard('Problem fetching repos')
+    }
+}
+
+function createUserCard(user) {
+    const userID = user.name || user.login
+    const userBio = user.bio ? `<p>${user.bio}</p>` : ''
+    const cardHTML = `
+    <div class="card">
+    <div>
+      <img src="${user.avatar_url}" alt="${user.name}" class="avatar">
+    </div>
+    <div class="user-info">
+      <h2>${userID}</h2>
+      ${userBio}
+      <ul>
+        <li>${user.followers} <strong>Followers</strong></li>
+        <li>${user.following} <strong>Following</strong></li>
+        <li>${user.public_repos} <strong>Repos</strong></li>
+      </ul>
+
+      <div id="repos"></div>
+    </div>
+  </div>
+    `
+    main.innerHTML = cardHTML
+    
+}
+
+function createErrorCard(msg) {
+    const cardHTML = `
+        <div class="card">
+            <h1>${msg}</h1>
+        </div>
+    `
+
+    main.innerHTML = cardHTML
+}
+
+function addReposToCard(repos) {
+    const reposEl = document.getElementById('repos')
+
+    repos
+        .slice(0, 5)
+        .forEach(repo => {
+            const repoEl = document.createElement('a')
+            repoEl.classList.add('repo')
+            repoEl.href = repo.html_url
+            repoEl.target = '_blank'
+            repoEl.innerText = repo.name
+
+            reposEl.appendChild(repoEl)
+        })
+}
+
+form.addEventListener('submit', (e) => {
+    e.preventDefault()
+
+    const user = search.value
+
+    if(user) {
+        getUser(user)
+
+        search.value = ''
+    }
+})
 
